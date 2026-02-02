@@ -30,4 +30,9 @@ body {
   th, td {
     padding: 6px !important;
   }
+
+  /* Hacer catálogos apilables en móvil */
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
 }

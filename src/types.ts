@@ -12,10 +12,21 @@ export interface AsignacionComida {
   dia: DiaSemana;
   tipoComida: TipoComida;
   platilloId: string | null;
+  notas?: string; // Para especificar vegetales, proteína, etc.
 }
 
 export interface MenuSemanal {
   id: string;
   fechaInicio: string; // ISO string del lunes de esa semana
   asignaciones: AsignacionComida[];
+}
+
+export interface OpcionCatalogo {
+  id: string;
+  nombre: string;
+}
+
+export interface Catalogos {
+  proteinas: OpcionCatalogo[];
+  vegetales: OpcionCatalogo[];
 }

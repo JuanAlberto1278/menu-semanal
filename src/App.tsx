@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { usePlatillos } from './usePlatillos';
 import { useMenuSemanal } from './useMenuSemanal';
+import { useCatalogos } from './useCatalogos';
 import { GestorPlatillos } from './GestorPlatillos';
+import { CatalogosVisual } from './CatalogosVisual';
 import { GridSemanal } from './GridSemanal';
 import { Historico } from './Historico';
 import './App.css';
@@ -25,15 +27,24 @@ function App() {
     cargarMenuSemana,
   } = useMenuSemanal();
 
-  const handleAsignarPlatillo = (dia: any, tipoComida: any, platilloId: string | null) => {
-    asignarPlatillo(dia, tipoComida, platilloId);
+  const {
+    catalogos,
+    loading: loadingCatalogos,
+    agregarProteina,
+    eliminarProteina,
+    agregarVegetal,
+    eliminarVegetal,
+  } = useCatalogos();
+
+  const handleAsignarPlatillo = (dia: any, tipoComida: any, platilloId: string | null, notas?: string) => {
+    asignarPlatillo(dia, tipoComida, platilloId, notas);
     // Deseleccionar después de asignar
     if (platilloId) {
       setPlatilloSeleccionado(null);
     }
   };
 
-  if (loadingPlatillos || loadingMenus) {
+  if (loadingPlatillos || loadingMenus || loadingCatalogos) {
     return (
       <div className="app-container">
         <div style={{
@@ -82,6 +93,14 @@ function App() {
       </header>
 
       <main>
+        <CatalogosVisual
+          catalogos={catalogos}
+          onAgregarProteina={agregarProteina}
+          onEliminarProteina={eliminarProteina}
+          onAgregarVegetal={agregarVegetal}
+          onEliminarVegetal={eliminarVegetal}
+        />
+
         <GestorPlatillos
           platillos={platillos}
           onAgregar={agregarPlatillo}

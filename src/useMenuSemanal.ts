@@ -89,10 +89,10 @@ export const useMenuSemanal = () => {
     return () => clearInterval(interval);
   }, [menuActual, menus]);
 
-  const asignarPlatillo = async (dia: DiaSemana, tipoComida: TipoComida, platilloId: string | null) => {
+  const asignarPlatillo = async (dia: DiaSemana, tipoComida: TipoComida, platilloId: string | null, notas?: string) => {
     const nuevasAsignaciones = menuActual.asignaciones.map(a =>
       a.dia === dia && a.tipoComida === tipoComida
-        ? { ...a, platilloId }
+        ? { ...a, platilloId, notas: notas || '' }
         : a
     );
 

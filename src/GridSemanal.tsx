@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { MenuSemanal, Platillo, DiaSemana, TipoComida } from './types';
 
 const DIAS: DiaSemana[] = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
@@ -23,23 +24,62 @@ interface Props {
   menu: MenuSemanal;
   platillos: Platillo[];
   platilloSeleccionado: string | null;
-  onAsignar: (dia: DiaSemana, tipoComida: TipoComida, platilloId: string | null) => void;
+  onAsignar: (dia: DiaSemana, tipoComida: TipoComida, platilloId: string | null, notas?: string) => void;
 }
 
 export const GridSemanal = ({ menu, platillos, platilloSeleccionado, onAsignar }: Props) => {
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [celdaEditando, setCeldaEditando] = useState<{ dia: DiaSemana; tipoComida: TipoComida } | null>(null);
+  const [notasTemp, setNotasTemp] = useState('');
+
+  const getAsignacion = (dia: DiaSemana, tipoComida: TipoComida) => {
+    return menu.asignaciones.find(a => a.dia === dia && a.tipoComida === tipoComida);
+  };
+
   const getPlatillo = (dia: DiaSemana, tipoComida: TipoComida): Platillo | null => {
-    const asignacion = menu.asignaciones.find(a => a.dia === dia && a.tipoComida === tipoComida);
+    const asignacion = getAsignacion(dia, tipoComida);
     if (!asignacion?.platilloId) return null;
     return platillos.find(p => p.id === asignacion.platilloId) || null;
   };
 
   const handleClick = (dia: DiaSemana, tipoComida: TipoComida) => {
     if (platilloSeleccionado) {
-      onAsignar(dia, tipoComida, platilloSeleccionado);
+      // Abrir modal para agregar notas
+      setCeldaEditando({ dia, tipoComida });
+      setNotasTemp('');
+      setModalAbierto(true);
     } else {
       // Si no hay platillo seleccionado, limpiar la casilla
-      onAsignar(dia, tipoComida, null);
+      onAsignar(dia, tipoComida, null, '');
     }
+  };
+
+  const handleEditarNotas = (dia: DiaSemana, tipoComida: TipoComida) => {
+    const asignacion = getAsignacion(dia, tipoComida);
+    setCeldaEditando({ dia, tipoComida });
+    setNotasTemp(asignacion?.notas || '');
+    setModalAbierto(true);
+  };
+
+  const handleGuardarNotas = () => {
+    if (celdaEditando) {
+      const asignacion = getAsignacion(celdaEditando.dia, celdaEditando.tipoComida);
+      onAsignar(
+        celdaEditando.dia, 
+        celdaEditando.tipoComida, 
+        platilloSeleccionado || asignacion?.platilloId || null,
+        notasTemp
+      );
+    }
+    setModalAbierto(false);
+    setCeldaEditando(null);
+    setNotasTemp('');
+  };
+
+  const handleCancelar = () => {
+    setModalAbierto(false);
+    setCeldaEditando(null);
+    setNotasTemp('');
   };
 
   const formatFecha = (fechaISO: string) => {
@@ -99,6 +139,7 @@ export const GridSemanal = ({ menu, platillos, platilloSeleccionado, onAsignar }
                 </td>
                 {DIAS.map(dia => {
                   const platillo = getPlatillo(dia, comida);
+                  const asignacion = getAsignacion(dia, comida);
                   return (
                     <td
                       key={`${dia}-${comida}`}
@@ -126,29 +167,55 @@ export const GridSemanal = ({ menu, platillos, platilloSeleccionado, onAsignar }
                           <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
                             {platillo.nombre}
                           </div>
-                          {platillo.descripcion && (
-                            <div style={{ fontSize: '11px', color: '#666' }}>
-                              {platillo.descripcion}
+                          {asignacion?.notas && (
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: '#1976D2',
+                              fontStyle: 'italic',
+                              marginBottom: '4px',
+                              backgroundColor: '#E3F2FD',
+                              padding: '4px',
+                              borderRadius: '3px'
+                            }}>
+                              📝 {asignacion.notas}
                             </div>
                           )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAsignar(dia, comida, null);
-                            }}
-                            style={{
-                              marginTop: '6px',
-                              padding: '3px 6px',
-                              fontSize: '10px',
-                              backgroundColor: '#f44336',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Quitar
-                          </button>
+                          <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditarNotas(dia, comida);
+                              }}
+                              style={{
+                                padding: '3px 6px',
+                                fontSize: '10px',
+                                backgroundColor: '#2196F3',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '3px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {asignacion?.notas ? 'Editar notas' : '+ Notas'}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onAsignar(dia, comida, null, '');
+                              }}
+                              style={{
+                                padding: '3px 6px',
+                                fontSize: '10px',
+                                backgroundColor: '#f44336',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '3px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Quitar
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ 
@@ -177,8 +244,89 @@ export const GridSemanal = ({ menu, platillos, platilloSeleccionado, onAsignar }
         fontSize: '14px'
       }}>
         <strong>Instrucciones:</strong> Selecciona un platillo arriba y luego haz click en una casilla para asignarlo. 
-        Para quitar un platillo, haz click en el botón "Quitar" o click en la casilla sin tener platillo seleccionado.
+        Puedes agregar notas (ej: "Ensalada César + Pollo") haciendo click en "+ Notas" o durante la asignación.
+        Para quitar un platillo, haz click en "Quitar".
       </div>
+
+      {/* Modal para editar notas */}
+      {modalAbierto && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '30px',
+            borderRadius: '8px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '20px' }}>
+              Detalles adicionales
+            </h3>
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+              Agrega detalles como vegetales, proteína, guarnición, etc.
+            </p>
+            <textarea
+              value={notasTemp}
+              onChange={(e) => setNotasTemp(e.target.value)}
+              placeholder="Ej: Ensalada verde + Pollo a la plancha"
+              style={{
+                width: '100%',
+                minHeight: '100px',
+                padding: '10px',
+                fontSize: '14px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                boxSizing: 'border-box',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleCancelar}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#999',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardarNotas}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
