@@ -1,49 +1,70 @@
 import { useState, useEffect } from 'react';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from './firebase';
 import { Platillo } from './types';
 
-const STORAGE_KEY = 'menu-platillos';
-
 export const usePlatillos = () => {
-  const [platillos, setPlatillos] = useState<Platillo[]>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    // Platillos de ejemplo iniciales
-    return [
-      { id: '1', nombre: 'Gallo Pinto', descripcion: 'Arroz y frijoles' },
-      { id: '2', nombre: 'Casado', descripcion: 'Arroz, frijoles, carne, ensalada' },
-      { id: '3', nombre: 'Olla de Carne', descripcion: 'Sopa con verduras' },
-      { id: '4', nombre: 'Arroz con Pollo', descripcion: 'Arroz amarillo con pollo' },
-      { id: '5', nombre: 'Pasta Alfredo', descripcion: 'Pasta con salsa cremosa' },
-    ];
-  });
+  const [platillos, setPlatillos] = useState<Platillo[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // Escuchar cambios en tiempo real de Firestore
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(platillos));
-  }, [platillos]);
+    const unsubscribe = onSnapshot(
+      collection(db, 'platillos'),
+      (snapshot) => {
+        const platillosData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as Platillo));
+        setPlatillos(platillosData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error al cargar platillos:', error);
+        setLoading(false);
+      }
+    );
 
-  const agregarPlatillo = (nombre: string, descripcion?: string) => {
-    const nuevo: Platillo = {
-      id: Date.now().toString(),
-      nombre,
-      descripcion,
-    };
-    setPlatillos([...platillos, nuevo]);
+    return () => unsubscribe();
+  }, []);
+
+  const agregarPlatillo = async (nombre: string, descripcion?: string) => {
+    try {
+      await addDoc(collection(db, 'platillos'), {
+        nombre,
+        descripcion: descripcion || '',
+      });
+    } catch (error) {
+      console.error('Error al agregar platillo:', error);
+      alert('Error al agregar platillo. Por favor intenta de nuevo.');
+    }
   };
 
-  const editarPlatillo = (id: string, nombre: string, descripcion?: string) => {
-    setPlatillos(platillos.map(p => 
-      p.id === id ? { ...p, nombre, descripcion } : p
-    ));
+  const editarPlatillo = async (id: string, nombre: string, descripcion?: string) => {
+    try {
+      const platilloRef = doc(db, 'platillos', id);
+      await updateDoc(platilloRef, {
+        nombre,
+        descripcion: descripcion || '',
+      });
+    } catch (error) {
+      console.error('Error al editar platillo:', error);
+      alert('Error al editar platillo. Por favor intenta de nuevo.');
+    }
   };
 
-  const eliminarPlatillo = (id: string) => {
-    setPlatillos(platillos.filter(p => p.id !== id));
+  const eliminarPlatillo = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'platillos', id));
+    } catch (error) {
+      console.error('Error al eliminar platillo:', error);
+      alert('Error al eliminar platillo. Por favor intenta de nuevo.');
+    }
   };
 
   return {
     platillos,
+    loading,
     agregarPlatillo,
     editarPlatillo,
     eliminarPlatillo,

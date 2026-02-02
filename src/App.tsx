@@ -11,6 +11,7 @@ function App() {
   
   const { 
     platillos, 
+    loading: loadingPlatillos,
     agregarPlatillo, 
     editarPlatillo, 
     eliminarPlatillo 
@@ -19,6 +20,7 @@ function App() {
   const {
     menuActual,
     menusHistorico,
+    loading: loadingMenus,
     asignarPlatillo,
     cargarMenuSemana,
   } = useMenuSemanal();
@@ -31,6 +33,39 @@ function App() {
     }
   };
 
+  if (loadingPlatillos || loadingMenus) {
+    return (
+      <div className="app-container">
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+          flexDirection: 'column',
+          gap: '20px'
+        }}>
+          <div style={{
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #1976D2',
+            borderRadius: '50%',
+            width: '50px',
+            height: '50px',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <p style={{ color: '#666', fontSize: '18px' }}>Cargando datos...</p>
+        </div>
+        <style>
+          {`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}
+        </style>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       <header style={{
@@ -42,7 +77,7 @@ function App() {
       }}>
         <h1 style={{ margin: 0 }}>🍽️ Planificador de Menú Semanal</h1>
         <p style={{ margin: '5px 0 0 0', opacity: 0.9 }}>
-          Organiza tus comidas de la semana fácilmente
+          Organiza tus comidas de la semana fácilmente - ¡Sincronizado en tiempo real! 🔄
         </p>
       </header>
 
@@ -78,6 +113,8 @@ function App() {
         borderTop: '1px solid #ddd'
       }}>
         Los menús se reinician automáticamente cada lunes. El histórico mantiene las últimas 4 semanas.
+        <br />
+        <strong>✨ Sincronización en tiempo real activada - Todos ven los mismos cambios al instante</strong>
       </footer>
     </div>
   );

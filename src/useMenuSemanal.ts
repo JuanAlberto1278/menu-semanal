@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
+import { collection, onSnapshot, doc, setDoc, query, where, orderBy } from 'firebase/firestore';
+import { db } from './firebase';
 import { MenuSemanal, DiaSemana, TipoComida } from './types';
 import { getLunesActual, formatFecha, esDelUltimoMes } from './utils';
-
-const STORAGE_KEY = 'menu-semanales';
 
 const DIAS: DiaSemana[] = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 const COMIDAS: TipoComida[] = ['desayuno', 'almuerzo', 'cena'];
@@ -24,62 +24,87 @@ const crearMenuVacio = (fechaInicio: string): MenuSemanal => {
 };
 
 export const useMenuSemanal = () => {
-  const [menus, setMenus] = useState<MenuSemanal[]>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const menusGuardados = JSON.parse(stored);
-      // Filtrar solo los del último mes
-      return menusGuardados.filter((m: MenuSemanal) => esDelUltimoMes(m.fechaInicio));
-    }
-    return [];
-  });
-
+  const [menus, setMenus] = useState<MenuSemanal[]>([]);
   const [menuActual, setMenuActual] = useState<MenuSemanal>(() => {
     const lunesActual = formatFecha(getLunesActual());
-    const menuExistente = menus.find(m => m.fechaInicio === lunesActual);
-    return menuExistente || crearMenuVacio(lunesActual);
+    return crearMenuVacio(lunesActual);
   });
+  const [loading, setLoading] = useState(true);
 
-  // Guardar menús en localStorage
+  // Escuchar cambios en Firestore
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(menus));
-  }, [menus]);
+    const unsubscribe = onSnapshot(
+      collection(db, 'menus'),
+      (snapshot) => {
+        const menusData = snapshot.docs.map(doc => ({
+          ...doc.data()
+        } as MenuSemanal));
+        
+        // Filtrar solo los del último mes
+        const menusFiltrados = menusData.filter(m => esDelUltimoMes(m.fechaInicio));
+        setMenus(menusFiltrados);
+        
+        // Buscar el menú de la semana actual
+        const lunesActual = formatFecha(getLunesActual());
+        const menuExistente = menusData.find(m => m.fechaInicio === lunesActual);
+        
+        if (menuExistente) {
+          setMenuActual(menuExistente);
+        } else {
+          // Si no existe, crear uno nuevo
+          const nuevoMenu = crearMenuVacio(lunesActual);
+          setMenuActual(nuevoMenu);
+          // Guardarlo en Firestore
+          setDoc(doc(db, 'menus', lunesActual), nuevoMenu);
+        }
+        
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error al cargar menús:', error);
+        setLoading(false);
+      }
+    );
 
-  // Verificar si cambió la semana y actualizar
+    return () => unsubscribe();
+  }, []);
+
+  // Verificar si cambió la semana
   useEffect(() => {
     const verificarSemana = () => {
       const lunesActual = formatFecha(getLunesActual());
       if (menuActual.fechaInicio !== lunesActual) {
-        // Guardar el menú anterior si no está guardado
-        if (!menus.find(m => m.fechaInicio === menuActual.fechaInicio)) {
-          setMenus([...menus, menuActual]);
+        const menuExistente = menus.find(m => m.fechaInicio === lunesActual);
+        if (menuExistente) {
+          setMenuActual(menuExistente);
+        } else {
+          const nuevoMenu = crearMenuVacio(lunesActual);
+          setMenuActual(nuevoMenu);
+          setDoc(doc(db, 'menus', lunesActual), nuevoMenu);
         }
-        
-        // Crear o cargar el nuevo menú
-        const nuevoMenu = menus.find(m => m.fechaInicio === lunesActual) || crearMenuVacio(lunesActual);
-        setMenuActual(nuevoMenu);
       }
     };
 
-    // Verificar al montar y cada hora
-    verificarSemana();
     const interval = setInterval(verificarSemana, 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, [menuActual, menus]);
 
-  const asignarPlatillo = (dia: DiaSemana, tipoComida: TipoComida, platilloId: string | null) => {
+  const asignarPlatillo = async (dia: DiaSemana, tipoComida: TipoComida, platilloId: string | null) => {
     const nuevasAsignaciones = menuActual.asignaciones.map(a =>
       a.dia === dia && a.tipoComida === tipoComida
         ? { ...a, platilloId }
         : a
     );
 
-    setMenuActual({ ...menuActual, asignaciones: nuevasAsignaciones });
-  };
+    const menuActualizado = { ...menuActual, asignaciones: nuevasAsignaciones };
+    setMenuActual(menuActualizado);
 
-  const guardarMenuActual = () => {
-    const menusActualizados = menus.filter(m => m.fechaInicio !== menuActual.fechaInicio);
-    setMenus([...menusActualizados, menuActual]);
+    try {
+      await setDoc(doc(db, 'menus', menuActual.fechaInicio), menuActualizado);
+    } catch (error) {
+      console.error('Error al guardar menú:', error);
+      alert('Error al guardar el menú. Por favor intenta de nuevo.');
+    }
   };
 
   const cargarMenuSemana = (fechaInicio: string) => {
@@ -89,15 +114,11 @@ export const useMenuSemanal = () => {
     }
   };
 
-  // Guardar automáticamente al cambiar asignaciones
-  useEffect(() => {
-    guardarMenuActual();
-  }, [menuActual.asignaciones]);
-
   return {
     menuActual,
     menusHistorico: menus.filter(m => m.fechaInicio !== menuActual.fechaInicio),
     asignarPlatillo,
     cargarMenuSemana,
+    loading,
   };
 };
